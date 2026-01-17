@@ -17,3 +17,16 @@ export interface GameBoardProps {
   onCellReveal: (row: number, col: number) => void;
   onCellFlag: (row: number, col: number) => void;
 }
+
+export type Board = CellState[][];
+
+export interface GameConfig {
+  rows: number;
+  cols: number;
+  mineCount: number;
+}
+
+export interface Position {
+  row: number;
+  col: number;
+}

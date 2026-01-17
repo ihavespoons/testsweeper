@@ -184,3 +184,120 @@ export function createBoardWithMines(
   board = calculateNumbers(board);
   return board;
 }
+
+/**
+ * Checks if the game is lost (a mine has been revealed)
+ */
+export function checkGameLost(board: Board): boolean {
+  for (const row of board) {
+    for (const cell of row) {
+      if (cell.content === 'mine' && cell.isRevealed) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Checks if the game is won (all non-mine cells are revealed)
+ */
+export function checkGameWon(board: Board): boolean {
+  for (const row of board) {
+    for (const cell of row) {
+      // If there's a non-mine cell that's not revealed, game is not won
+      if (cell.content !== 'mine' && !cell.isRevealed) {
+        return false;
+      }
+    }
+  }
+  // All non-mine cells are revealed, and at least one cell exists
+  return board.length > 0 && board[0].length > 0;
+}
+
+/**
+ * Reveals a single cell on the board. Returns a new board with the cell revealed.
+ * If the cell has 0 adjacent mines, recursively reveals all adjacent cells (flood-fill).
+ */
+export function revealCell(board: Board, row: number, col: number): Board {
+  const rows = board.length;
+  if (rows === 0) return board;
+  const cols = board[0].length;
+  if (cols === 0) return board;
+
+  // Validate position
+  if (!isValidPosition(row, col, rows, cols)) return board;
+
+  // Can't reveal flagged or already revealed cells
+  if (board[row][col].isFlagged || board[row][col].isRevealed) {
+    return board;
+  }
+
+  // Create a new board with the cell revealed
+  const newBoard = board.map(r => r.map(cell => ({ ...cell })));
+  newBoard[row][col].isRevealed = true;
+
+  // If it's a mine or has adjacent mines, just return the revealed board
+  if (newBoard[row][col].content === 'mine' || newBoard[row][col].content > 0) {
+    return newBoard;
+  }
+
+  // Flood-fill: if it's a zero cell, reveal all adjacent cells
+  const neighbors = getNeighbors(row, col, rows, cols);
+  let resultBoard = newBoard;
+  for (const neighbor of neighbors) {
+    resultBoard = revealCell(resultBoard, neighbor.row, neighbor.col);
+  }
+
+  return resultBoard;
+}
+
+/**
+ * Reveals all mines on the board (used when game is lost)
+ */
+export function revealAllMines(board: Board): Board {
+  return board.map(row =>
+    row.map(cell => ({
+      ...cell,
+      isRevealed: cell.content === 'mine' ? true : cell.isRevealed,
+    }))
+  );
+}
+
+/**
+ * Toggles the flag state on a cell. Returns a new board.
+ * Can only flag cells that are not revealed.
+ */
+export function toggleFlag(board: Board, row: number, col: number): Board {
+  const rows = board.length;
+  if (rows === 0) return board;
+  const cols = board[0].length;
+  if (cols === 0) return board;
+
+  // Validate position
+  if (!isValidPosition(row, col, rows, cols)) return board;
+
+  // Can't flag revealed cells
+  if (board[row][col].isRevealed) {
+    return board;
+  }
+
+  const newBoard = board.map(r => r.map(cell => ({ ...cell })));
+  newBoard[row][col].isFlagged = !newBoard[row][col].isFlagged;
+  return newBoard;
+}
+
+/**
+ * Counts the number of flags placed on the board
+ */
+export function countFlags(board: Board): number {
+  let count = 0;
+  for (const row of board) {
+    for (const cell of row) {
+      if (cell.isFlagged) {
+        count++;
+      }
+    }
+  }
+  return count;
+}

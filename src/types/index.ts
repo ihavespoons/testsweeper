@@ -30,3 +30,5 @@ export interface Position {
   row: number;
   col: number;
 }
+
+export type GameStatus = 'idle' | 'playing' | 'won' | 'lost';

@@ -10,6 +10,12 @@ import {
   calculateNumbers,
   createBoard,
   createBoardWithMines,
+  checkGameLost,
+  checkGameWon,
+  revealCell,
+  revealAllMines,
+  toggleFlag,
+  countFlags,
 } from './gameLogic';
 import type { Position } from '../types';
 
@@ -527,6 +533,273 @@ describe('gameLogic', () => {
           expect(board1[row][col].content).toBe(board2[row][col].content);
         }
       }
+    });
+  });
+
+  describe('checkGameLost', () => {
+    it('returns false when no mines are revealed', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 1, col: 1 }]);
+      expect(checkGameLost(board)).toBe(false);
+    });
+
+    it('returns true when a mine is revealed', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 1, col: 1 }]);
+      board[1][1].isRevealed = true;
+      expect(checkGameLost(board)).toBe(true);
+    });
+
+    it('returns false when only non-mine cells are revealed', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      board[2][2].isRevealed = true;
+      expect(checkGameLost(board)).toBe(false);
+    });
+
+    it('returns true when any of multiple mines is revealed', () => {
+      const board = createBoardWithMines(3, 3, [
+        { row: 0, col: 0 },
+        { row: 2, col: 2 },
+      ]);
+      board[2][2].isRevealed = true;
+      expect(checkGameLost(board)).toBe(true);
+    });
+
+    it('returns false for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      expect(checkGameLost(board)).toBe(false);
+    });
+  });
+
+  describe('checkGameWon', () => {
+    it('returns false when non-mine cells are not revealed', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 1, col: 1 }]);
+      expect(checkGameWon(board)).toBe(false);
+    });
+
+    it('returns true when all non-mine cells are revealed', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 1, col: 1 }]);
+      // Reveal all cells except the mine
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          if (board[row][col].content !== 'mine') {
+            board[row][col].isRevealed = true;
+          }
+        }
+      }
+      expect(checkGameWon(board)).toBe(true);
+    });
+
+    it('returns false when some non-mine cells are not revealed', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 1, col: 1 }]);
+      board[0][0].isRevealed = true;
+      board[0][1].isRevealed = true;
+      expect(checkGameWon(board)).toBe(false);
+    });
+
+    it('returns false for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      expect(checkGameWon(board)).toBe(false);
+    });
+
+    it('returns false for board with empty rows', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [[]];
+      expect(checkGameWon(board)).toBe(false);
+    });
+
+    it('returns true even if mine cell is not revealed (only non-mines need revealing)', () => {
+      const board = createBoardWithMines(2, 2, [{ row: 0, col: 0 }]);
+      // Only reveal non-mine cells
+      board[0][1].isRevealed = true;
+      board[1][0].isRevealed = true;
+      board[1][1].isRevealed = true;
+      expect(checkGameWon(board)).toBe(true);
+    });
+  });
+
+  describe('revealCell', () => {
+    it('reveals a single cell', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      const newBoard = revealCell(board, 2, 2);
+      expect(newBoard[2][2].isRevealed).toBe(true);
+    });
+
+    it('does not modify original board', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      revealCell(board, 2, 2);
+      expect(board[2][2].isRevealed).toBe(false);
+    });
+
+    it('does not reveal flagged cells', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      board[2][2].isFlagged = true;
+      const newBoard = revealCell(board, 2, 2);
+      expect(newBoard[2][2].isRevealed).toBe(false);
+    });
+
+    it('does not reveal already revealed cells', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      board[2][2].isRevealed = true;
+      const newBoard = revealCell(board, 2, 2);
+      expect(newBoard).toEqual(board);
+    });
+
+    it('returns same board for invalid position', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      expect(revealCell(board, -1, 0)).toBe(board);
+      expect(revealCell(board, 0, -1)).toBe(board);
+      expect(revealCell(board, 3, 0)).toBe(board);
+      expect(revealCell(board, 0, 3)).toBe(board);
+    });
+
+    it('returns same board for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      expect(revealCell(board, 0, 0)).toBe(board);
+    });
+
+    it('reveals a mine cell', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 1, col: 1 }]);
+      const newBoard = revealCell(board, 1, 1);
+      expect(newBoard[1][1].isRevealed).toBe(true);
+      expect(newBoard[1][1].content).toBe('mine');
+    });
+
+    it('flood-fills adjacent cells when revealing a zero cell', () => {
+      // Create a board with mine at corner, leaving rest as zeros or small numbers
+      const board = createBoardWithMines(5, 5, [{ row: 0, col: 0 }]);
+      // Reveal a cell far from the mine (should trigger flood-fill)
+      const newBoard = revealCell(board, 4, 4);
+
+      // The revealed cell should be revealed
+      expect(newBoard[4][4].isRevealed).toBe(true);
+      // Adjacent cells with 0 should also be revealed
+      expect(newBoard[3][3].isRevealed).toBe(true);
+      expect(newBoard[4][3].isRevealed).toBe(true);
+      expect(newBoard[3][4].isRevealed).toBe(true);
+    });
+
+    it('stops flood-fill at numbered cells', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      // Reveal the far corner (should not reveal cells adjacent to mine)
+      const newBoard = revealCell(board, 2, 2);
+
+      expect(newBoard[2][2].isRevealed).toBe(true);
+      // Cell at (1,1) has content 1 (adjacent to mine), should be revealed but stop the fill
+      expect(newBoard[1][1].isRevealed).toBe(true);
+      // The mine itself should not be revealed
+      expect(newBoard[0][0].isRevealed).toBe(false);
+    });
+
+    it('reveals numbered cell without flood-fill', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      // Cell at (1,1) is adjacent to mine, so has count > 0
+      const newBoard = revealCell(board, 1, 1);
+
+      expect(newBoard[1][1].isRevealed).toBe(true);
+      // Adjacent cells should not be auto-revealed since (1,1) is not a zero cell
+      expect(newBoard[0][0].isRevealed).toBe(false);
+      expect(newBoard[2][2].isRevealed).toBe(false);
+    });
+  });
+
+  describe('revealAllMines', () => {
+    it('reveals all mine cells', () => {
+      const board = createBoardWithMines(3, 3, [
+        { row: 0, col: 0 },
+        { row: 2, col: 2 },
+      ]);
+      const newBoard = revealAllMines(board);
+
+      expect(newBoard[0][0].isRevealed).toBe(true);
+      expect(newBoard[2][2].isRevealed).toBe(true);
+    });
+
+    it('does not reveal non-mine cells', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      const newBoard = revealAllMines(board);
+
+      expect(newBoard[1][1].isRevealed).toBe(false);
+      expect(newBoard[2][2].isRevealed).toBe(false);
+    });
+
+    it('preserves already revealed cells', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      board[1][1].isRevealed = true;
+      const newBoard = revealAllMines(board);
+
+      expect(newBoard[1][1].isRevealed).toBe(true);
+    });
+
+    it('does not modify original board', () => {
+      const board = createBoardWithMines(3, 3, [{ row: 0, col: 0 }]);
+      revealAllMines(board);
+
+      expect(board[0][0].isRevealed).toBe(false);
+    });
+  });
+
+  describe('toggleFlag', () => {
+    it('flags an unflagged cell', () => {
+      const board = createEmptyBoard(3, 3);
+      const newBoard = toggleFlag(board, 1, 1);
+      expect(newBoard[1][1].isFlagged).toBe(true);
+    });
+
+    it('unflags a flagged cell', () => {
+      const board = createEmptyBoard(3, 3);
+      board[1][1].isFlagged = true;
+      const newBoard = toggleFlag(board, 1, 1);
+      expect(newBoard[1][1].isFlagged).toBe(false);
+    });
+
+    it('does not flag revealed cells', () => {
+      const board = createEmptyBoard(3, 3);
+      board[1][1].isRevealed = true;
+      const newBoard = toggleFlag(board, 1, 1);
+      expect(newBoard[1][1].isFlagged).toBe(false);
+    });
+
+    it('does not modify original board', () => {
+      const board = createEmptyBoard(3, 3);
+      toggleFlag(board, 1, 1);
+      expect(board[1][1].isFlagged).toBe(false);
+    });
+
+    it('returns same board for invalid position', () => {
+      const board = createEmptyBoard(3, 3);
+      expect(toggleFlag(board, -1, 0)).toBe(board);
+      expect(toggleFlag(board, 0, -1)).toBe(board);
+      expect(toggleFlag(board, 3, 0)).toBe(board);
+      expect(toggleFlag(board, 0, 3)).toBe(board);
+    });
+
+    it('returns same board for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      expect(toggleFlag(board, 0, 0)).toBe(board);
+    });
+  });
+
+  describe('countFlags', () => {
+    it('returns 0 when no flags', () => {
+      const board = createEmptyBoard(3, 3);
+      expect(countFlags(board)).toBe(0);
+    });
+
+    it('counts single flag', () => {
+      const board = createEmptyBoard(3, 3);
+      board[0][0].isFlagged = true;
+      expect(countFlags(board)).toBe(1);
+    });
+
+    it('counts multiple flags', () => {
+      const board = createEmptyBoard(3, 3);
+      board[0][0].isFlagged = true;
+      board[1][1].isFlagged = true;
+      board[2][2].isFlagged = true;
+      expect(countFlags(board)).toBe(3);
+    });
+
+    it('returns 0 for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      expect(countFlags(board)).toBe(0);
     });
   });
 });

@@ -121,7 +121,13 @@ export function placeMines(board: Board, minePositions: Position[]): Board {
  */
 export function countAdjacentMines(board: Board, row: number, col: number): number {
   const rows = board.length;
+  if (rows === 0) return 0;
   const cols = board[0].length;
+  if (cols === 0) return 0;
+
+  // Validate position is within bounds
+  if (!isValidPosition(row, col, rows, cols)) return 0;
+
   const neighbors = getNeighbors(row, col, rows, cols);
 
   return neighbors.filter(
@@ -134,7 +140,10 @@ export function countAdjacentMines(board: Board, row: number, col: number): numb
  */
 export function calculateNumbers(board: Board): Board {
   const rows = board.length;
+  if (rows === 0) return [];
   const cols = board[0].length;
+  if (cols === 0) return board.map(() => []);
+
   const newBoard = board.map(row => row.map(cell => ({ ...cell })));
 
   for (let row = 0; row < rows; row++) {

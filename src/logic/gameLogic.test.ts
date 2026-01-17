@@ -290,6 +290,25 @@ describe('gameLogic', () => {
 
       expect(countAdjacentMines(board, 0, 1)).toBe(2);
     });
+
+    it('returns 0 for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      expect(countAdjacentMines(board, 0, 0)).toBe(0);
+    });
+
+    it('returns 0 for board with empty rows', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [[]];
+      expect(countAdjacentMines(board, 0, 0)).toBe(0);
+    });
+
+    it('returns 0 for out-of-bounds position', () => {
+      const board = createEmptyBoard(3, 3);
+      board[0][0].content = 'mine';
+      expect(countAdjacentMines(board, -1, 0)).toBe(0);
+      expect(countAdjacentMines(board, 0, -1)).toBe(0);
+      expect(countAdjacentMines(board, 3, 0)).toBe(0);
+      expect(countAdjacentMines(board, 0, 3)).toBe(0);
+    });
   });
 
   describe('calculateNumbers', () => {
@@ -343,6 +362,18 @@ describe('gameLogic', () => {
       calculateNumbers(board);
 
       expect(board[0][1].content).toBe(0);
+    });
+
+    it('returns empty array for empty board', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [];
+      const result = calculateNumbers(board);
+      expect(result).toEqual([]);
+    });
+
+    it('returns array of empty rows for board with empty rows', () => {
+      const board: ReturnType<typeof createEmptyBoard> = [[], []];
+      const result = calculateNumbers(board);
+      expect(result).toEqual([[], []]);
     });
   });
 

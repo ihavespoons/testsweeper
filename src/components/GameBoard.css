@@ -1,0 +1,11 @@
+.game-board {
+  display: grid;
+  gap: 0;
+  border: 3px solid #808080;
+  background-color: #c0c0c0;
+  width: fit-content;
+}
+
+.game-board__row {
+  display: contents;
+}

@@ -11,3 +11,9 @@ export interface CellProps {
   onReveal: () => void;
   onFlag: () => void;
 }
+
+export interface GameBoardProps {
+  grid: CellState[][];
+  onCellReveal: (row: number, col: number) => void;
+  onCellFlag: (row: number, col: number) => void;
+}
